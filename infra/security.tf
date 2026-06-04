@@ -51,6 +51,14 @@ resource "aws_security_group" "ec2sg" {
     cidr_blocks = ["0.0.0.0/0"]  # Good practice: lock this to your IP e.g. ["1.2.3.4/32"]
   }
 
+  ingress {
+  description = "HTTPS to VPC endpoints for SSM and AWS APIs"
+  from_port   = 443
+  to_port     = 443
+  protocol    = "tcp"
+  cidr_blocks = ["10.0.0.0/16"]  
+}
+
   egress {
     from_port   = 0
     to_port     = 0
@@ -85,4 +93,27 @@ resource "aws_security_group" "rds" {
   }
 
   tags = { Name = "${var.project_name}-rdssg-sg" }
+}
+
+resource "aws_security_group" "vpc_endpoints" {
+  name        = "${var.project_name}-endpointssg"
+  description = "Security group for VPC endpoints"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    description = "HTTPS from entire VPC"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["10.0.0.0/16"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = { Name = "${var.project_name}-endpointssg" }
 }

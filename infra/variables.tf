@@ -39,7 +39,7 @@ variable "db_password" {
 variable "instance_type" {
   description = "EC2 instancetype"
   type        = string
-  default     = "t3.micro" # good for dev/test, change to t3.small or t3.medium for prod    
+  default     = "t3.small" # good for dev/test, change to t3.small or t3.medium for prod    
 }
 
 variable "db_name" {

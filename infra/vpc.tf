@@ -71,3 +71,38 @@ resource "aws_route_table_association" "publicroute" {
   subnet_id      = aws_subnet.publicsubnet[count.index].id
   route_table_id = aws_route_table.publicroute.id
 }
+
+# Route table for private subnets to route traffic 
+resource "aws_route_table" "private_app_route" {
+  vpc_id = aws_vpc.main.id
+
+  tags = { Name = "${var.project_name}-privateapp-rt" }
+}
+
+resource "aws_route_table_association" "private_app" {
+  count          = 2
+  subnet_id      = aws_subnet.private_app_subnet[count.index].id
+  route_table_id = aws_route_table.private_app_route.id
+}
+
+# elastic IP for NAT gateway
+resource "aws_eip" "nat" {
+  domain = "vpc"
+  tags   = { Name = "${var.project_name}-nat-eip" }
+}
+
+# NAT Gateway in public subnet to allow internet access for private subnets, required for patching and updates, and also for SSM to work in private subnets
+resource "aws_nat_gateway" "natmain" {
+  allocation_id = aws_eip.nat.id
+  subnet_id     = aws_subnet.publicsubnet[0].id
+  depends_on    = [aws_internet_gateway.IGW]  # Ensure IGW is created before NAT
+  tags          = { Name = "${var.project_name}-nat" }
+}
+
+# Add default route to private app route table via NAT
+
+resource "aws_route" "private_app_internet" {
+  route_table_id         = aws_route_table.private_app_route.id
+  destination_cidr_block = "0.0.0.0/0"
+  nat_gateway_id         = aws_nat_gateway.natmain.id
+}

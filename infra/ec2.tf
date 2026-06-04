@@ -68,3 +68,25 @@ resource "aws_iam_instance_profile" "app_8bytes" {
   name = "${var.project_name}-app-profile"
   role = aws_iam_role.iamroleapp.name
 }
+
+resource "aws_iam_role_policy_attachment" "ecr" {
+  role       = aws_iam_role.iamroleapp.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess"
+}
+
+resource "aws_iam_role_policy" "ssm_send_command" {
+  name = "${var.project_name}-ssm-send-command"
+  role = aws_iam_role.iamroleapp.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "ssm:SendCommand",
+        "ssm:GetCommandInvocation"
+      ]
+      Resource = "*"
+    }]
+  })
+}
