@@ -1,1 +1,88 @@
+# Challenges & Resolutions
 
+1. SSM Agent offline in private subnet
+Challenge: EC2 in private subnet couldn't connect to SSM endpoints after provisioning. The agent kept going into hibernation with "credentials failed" error.
+
+Root cause: Private subnet had no route to AWS SSM endpoints. Interface endpoints existed but the security group was blocking port 443, and the private subnet had no dedicated route table.
+
+# Resolution:
+
+- Created dedicated security group for VPC endpoints allowing port 443 from entire VPC CIDR (10.0.0.0/16)
+- Created private subnet route table and associated it with app subnets
+- Added S3 Gateway endpoint for package downloads
+- Added NAT Gateway for outbound internet access during setup
+
+
+# Jenkins GPG key mismatch
+
+Challenge: Jenkins installation failed with "GPG check FAILED" even after importing the official key.
+
+Root cause: Jenkins rotated their signing key and the downloaded repo file was only 162 bytes — clearly not a valid repo file.
+
+Resolution: Manually created the repo file with correct content and disabled GPG check (gpgcheck=0). Acceptable for this assignment — production would use the official Jenkins Docker image instead.
+
+## 3. Jenkins requires Java 21
+Challenge: Installed Java 17 but Jenkins 2.555.2 requires Java 21 minimum. Service failed silently until running `/usr/bin/jenkins` directly revealed the error.
+
+Resolution: Installed java-21-amazon-corretto, set it as default using alternatives --set java, and reset the failed systemd service state with `systemctl reset-failed jenkins`.
+
+
+## 4. EC2 disk volume too small
+Challenge: terraform apply failed — "Volume of size 20GB is smaller than snapshot, expect size >= 30GB."
+
+Resolution: Updated `root_block_device` volume_size from 20 to 30 in `ec2.tf`.
+
+
+## 5. RDS backup retention on free tier
+ Challenge: RDS creation failed with FreeTierRestrictionError: backup retention period exceeds maximum available to free tier customers.
+
+ Resolution: Set backup_retention_period = 0 and skip_final_snapshot = true for free tier. Added comment in code noting the production values (7-day retention, final snapshot enabled).
+
+
+## 6. PostgreSQL version not available in region
+ Challenge: engine_version = "15.4" failed — version not available in ap-south-1.
+
+ Resolution: Queried available versions with `aws rds describe-db-engine-versions --engine postgres` and updated to 15.16
+
+## 7. npm ci requires package-lock.json
+ Challenge: Pipeline failed at Install Dependencies stage — npm ci requires a lockfile that wasn't committed to the repo.
+
+##Resolution: Changed to npm install in Jenkinsfile. Production fix would be to commit package-lock.json to the repo and use npm ci for reproducible builds.
+
+
+## 8. Port 3000 already in use during tests
+
+Challenge: tests failed with EADDRINUSE: address already in use :::3000` on every run after the first because the server kept binding to port 3000.
+
+Resolution: Added `if (require.main === module)` guard in `index.js` so the server only starts listening when run directly, not when required by Jest. Also added `cleanWs()` to Jenkinsfile to wipe workspace before each build.
+
+## 9. Trivy permission denied installing to /usr/local/bin
+
+Challenge: Trivy install script failed —Jenkins user doesn't have write access to /usr/local/bin.
+
+Resolution: Created /var/lib/jenkins/bin` directory owned by jenkins user and installed Trivy there. Added `export PATH=$PATH:/var/lib/jenkins/bin` to scan stages.
+
+
+## 10. Jenkins out of memory during Trivy container scan
+
+Challenge:Trivy scanning a Docker image caused Jenkins to run out of memory on t3.small (2GB RAM), causing the SSM agent to go offline and the build to fail.
+
+#Resolution: 
+- Added --scanners vuln` flag to skip memory-heavy secret scanning
+- Added  --skip-db-update` to reuse already-downloaded vulnerability DB
+- Added 2GB swap file to EC2 (/swapfile) as a permanent fix
+
+
+## 11. Terraform state drift from manual instance type change
+ 
+
+Challenge: Manually upgraded EC2 instance type in AWS console caused Terraform state to drift. Next `terraform plan` would try to downgrade it back.
+
+Resolution: Ran terraform refresh to sync state with actual AWS resources, then updated variables.tf default to match the current instance type.
+
+
+## 12. CloudWatch log groups already existed
+
+Challenge: Terraform failed creating log groups — "ResourceAlreadyExistsException" because the CloudWatch agent had auto-created them before Terraform ran.
+
+Resolution: Used terraform state rm to remove from state, then terraform import to bring existing resources under Terraform management.
